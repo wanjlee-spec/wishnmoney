@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>心願預算本</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <h1>💰 心願預算本</h1>
+    <nav class="tabs">
+      <button class="tab-btn active" data-tab="ledger">記帳</button>
+      <button class="tab-btn" data-tab="analysis">消費分析</button>
+      <button class="tab-btn" data-tab="wishlist">心願清單</button>
+    </nav>
+  </header>
+
+  <main>
+    <!-- 記帳 -->
+    <section id="ledger" class="tab-panel active">
+      <div class="month-nav">
+        <button id="prevMonth" class="icon-btn">‹</button>
+        <span id="monthLabel" class="month-label"></span>
+        <button id="nextMonth" class="icon-btn">›</button>
+      </div>
+
+      <div class="summary-cards">
+        <div class="card income"><span class="card-label">收入</span><span class="card-value" id="sumIncome">$0</span></div>
+        <div class="card expense"><span class="card-label">支出</span><span class="card-value" id="sumExpense">$0</span></div>
+        <div class="card balance"><span class="card-label">結餘</span><span class="card-value" id="sumBalance">$0</span></div>
+      </div>
+
+      <form id="txForm" class="tx-form">
+        <div class="type-toggle">
+          <label><input type="radio" name="txType" value="income" checked> 收入</label>
+          <label><input type="radio" name="txType" value="expense"> 支出</label>
+        </div>
+        <div class="form-row">
+          <select id="txCategory" required></select>
+          <input type="number" id="txAmount" placeholder="金額" min="0" step="1" required>
+        </div>
+        <div class="form-row">
+          <input type="date" id="txDate" required>
+          <input type="text" id="txNote" placeholder="備註 (選填)">
+        </div>
+        <button type="submit" class="primary-btn">新增紀錄</button>
+      </form>
+
+      <ul id="txList" class="tx-list"></ul>
+    </section>
+
+    <!-- 消費分析 -->
+    <section id="analysis" class="tab-panel">
+      <div class="range-select">
+        <label>分析區間：</label>
+        <select id="rangeSelect">
+          <option value="6">最近 6 個月</option>
+          <option value="12" selected>最近 12 個月</option>
+          <option value="all">全部資料</option>
+        </select>
+      </div>
+
+      <div class="summary-cards">
+        <div class="card income"><span class="card-label">總收入</span><span class="card-value" id="anIncome">$0</span></div>
+        <div class="card expense"><span class="card-label">總支出</span><span class="card-value" id="anExpense">$0</span></div>
+        <div class="card balance"><span class="card-label">儲蓄率</span><span class="card-value" id="anSavingRate">0%</span></div>
+      </div>
+
+      <div class="chart-grid">
+        <div class="chart-box">
+          <h3>支出分類佔比</h3>
+          <canvas id="expensePie"></canvas>
+        </div>
+        <div class="chart-box">
+          <h3>收支趨勢</h3>
+          <canvas id="trendChart"></canvas>
+        </div>
+      </div>
+
+      <div id="insights" class="insights"></div>
+    </section>
+
+    <!-- 心願清單 -->
+    <section id="wishlist" class="tab-panel">
+      <form id="wishForm" class="wish-form">
+        <div class="form-row">
+          <input type="text" id="wishName" placeholder="心願名稱（例如：日本環島旅行）" required>
+        </div>
+        <div class="form-row">
+          <input type="date" id="wishDate" required>
+          <input type="number" id="wishCost" placeholder="預估支出" min="0" step="1" required>
+        </div>
+        <button type="submit" class="primary-btn">新增心願</button>
+      </form>
+
+      <div id="wishList" class="wish-list"></div>
+    </section>
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
