@@ -55,6 +55,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     document.getElementById(btn.dataset.tab).classList.add('active');
     if (btn.dataset.tab === 'analysis') renderAnalysis();
     if (btn.dataset.tab === 'wishlist') renderWishes();
+    if (btn.dataset.tab === 'qa') initQA();
   });
 });
 
@@ -414,6 +415,209 @@ function renderWishes() {
     btn.addEventListener('click', () => deleteWish(btn.dataset.id));
   });
 }
+
+// ================= 投資問答 =================
+const API_KEY_STORAGE = 'wishBudget_anthropicKey_v1';
+const CHAT_STORAGE = 'wishBudget_chatHistory_v1';
+const QA_MODEL = 'claude-sonnet-5';
+
+let chatHistory = [];
+try {
+  const raw = localStorage.getItem(CHAT_STORAGE);
+  if (raw) chatHistory = JSON.parse(raw);
+} catch (e) { chatHistory = []; }
+
+function saveChatHistory() {
+  try { localStorage.setItem(CHAT_STORAGE, JSON.stringify(chatHistory)); } catch (e) { /* ignore */ }
+}
+
+function getApiKey() {
+  try { return localStorage.getItem(API_KEY_STORAGE) || ''; } catch (e) { return ''; }
+}
+
+function setApiKey(key) {
+  try { localStorage.setItem(API_KEY_STORAGE, key); } catch (e) { /* ignore */ }
+}
+
+function clearApiKey() {
+  try { localStorage.removeItem(API_KEY_STORAGE); } catch (e) { /* ignore */ }
+}
+
+const apiKeySetup = document.getElementById('apiKeySetup');
+const qaMain = document.getElementById('qaMain');
+const apiKeyInput = document.getElementById('apiKeyInput');
+const chatMessagesBox = document.getElementById('chatMessages');
+const chatForm = document.getElementById('chatForm');
+const chatInput = document.getElementById('chatInput');
+const sendBtn = document.getElementById('sendBtn');
+
+function initQA() {
+  const key = getApiKey();
+  if (key) {
+    apiKeySetup.hidden = true;
+    qaMain.hidden = false;
+    renderChatMessages();
+  } else {
+    apiKeySetup.hidden = false;
+    qaMain.hidden = true;
+  }
+}
+
+document.getElementById('saveApiKey').addEventListener('click', () => {
+  const key = apiKeyInput.value.trim();
+  if (!key) return;
+  setApiKey(key);
+  apiKeyInput.value = '';
+  initQA();
+});
+
+document.getElementById('changeApiKey').addEventListener('click', () => {
+  clearApiKey();
+  initQA();
+});
+
+document.getElementById('clearChat').addEventListener('click', () => {
+  chatHistory = [];
+  saveChatHistory();
+  renderChatMessages();
+});
+
+function renderChatMessages() {
+  if (chatHistory.length === 0) {
+    chatMessagesBox.innerHTML = '<div class="empty-hint small">你可以問我任何跟投資、存錢配置有關的問題，例如：「我每月能存多少錢才能達成心願清單裡的目標？」</div>';
+    return;
+  }
+  chatMessagesBox.innerHTML = chatHistory.map(m =>
+    `<div class="chat-msg ${m.role === 'user' ? 'user' : 'assistant'}">${escapeHtml(m.content)}</div>`
+  ).join('');
+  chatMessagesBox.scrollTop = chatMessagesBox.scrollHeight;
+}
+
+function buildFinancialContext() {
+  const months = getAllMonthsSorted();
+  if (months.length === 0 && state.wishes.length === 0) return '（使用者目前尚未記錄任何收支或心願資料。）';
+
+  const recent = months.slice(-6);
+  let totalIncome = 0, totalExpense = 0;
+  const catTotals = {};
+  recent.forEach(m => {
+    state.transactions.forEach(t => {
+      if (monthKey(t.date) !== m) return;
+      if (t.type === 'income') totalIncome += t.amount;
+      else { totalExpense += t.amount; catTotals[t.category] = (catTotals[t.category] || 0) + t.amount; }
+    });
+  });
+  const avgIncome = recent.length ? totalIncome / recent.length : 0;
+  const avgExpense = recent.length ? totalExpense / recent.length : 0;
+  const avgSurplus = avgIncome - avgExpense;
+  const topCats = Object.entries(catTotals).sort((a, b) => b[1] - a[1]).slice(0, 5)
+    .map(([c, v]) => `${c} $${Math.round(v)}`).join('、') || '無';
+
+  const wishLines = state.wishes.map(w => {
+    const rem = timeRemaining(w.targetDate);
+    const monthlyNeeded = rem.expired ? w.cost : w.cost / rem.months;
+    return `- ${w.name}：目標日期 ${w.targetDate}，預估支出 $${w.cost}，剩餘約 ${rem.text}，每月需存約 $${Math.round(monthlyNeeded)}`;
+  }).join('\n') || '（目前沒有心願清單項目）';
+
+  return `以下是使用者近6個月的財務摘要（供回答時參考，非必要不用逐項複述）：
+近6個月平均每月收入：約 $${Math.round(avgIncome)}
+近6個月平均每月支出：約 $${Math.round(avgExpense)}
+近6個月平均每月結餘：約 $${Math.round(avgSurplus)}
+近6個月支出前五大類別：${topCats}
+
+心願清單：
+${wishLines}`;
+}
+
+function buildSystemPrompt(useContext) {
+  let prompt = `你是「心願預算本」網站內建的投資理財問答助理，使用繁體中文（台灣用語）回答問題。使用者是一般個人理財使用者，會詢問跟存錢、記帳習慣、投資工具（如ETF、數位帳戶、債券、基金等）相關的問題，特別是如何規劃每月存款以達成心願清單上的目標。
+
+回答原則：
+- 簡潔實用，避免過長的免責聲明重複出現，但可在必要時提醒「非正式投資建議」。
+- 若使用者提供財務數字，可直接幫忙試算（例如每月需存多少、幾年可達成）。
+- 提到具體投資工具時，簡單說明其風險特性（保守/中等/積極），不要保證報酬率。
+- 你不是持牌理財顧問，不做個股報明牌、不做確定性的獲利承諾。
+- 回答用一般口語、條列式，不要用 Markdown 標題語法。`;
+  if (useContext) {
+    prompt += `\n\n${buildFinancialContext()}`;
+  }
+  return prompt;
+}
+
+async function callClaudeAPI(userMessage, useContext) {
+  const apiKey = getApiKey();
+  const messages = chatHistory
+    .filter(m => m.role === 'user' || m.role === 'assistant')
+    .map(m => ({ role: m.role, content: m.content }));
+  messages.push({ role: 'user', content: userMessage });
+
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true'
+    },
+    body: JSON.stringify({
+      model: QA_MODEL,
+      max_tokens: 1024,
+      system: buildSystemPrompt(useContext),
+      messages
+    })
+  });
+
+  if (!res.ok) {
+    let detail = '';
+    try { detail = (await res.json()).error?.message || ''; } catch (e) { /* ignore */ }
+    throw new Error(`API 請求失敗 (${res.status})${detail ? '：' + detail : ''}`);
+  }
+  const data = await res.json();
+  const text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n').trim();
+  return text || '（沒有收到回應內容）';
+}
+
+chatForm.addEventListener('submit', async e => {
+  e.preventDefault();
+  const text = chatInput.value.trim();
+  if (!text) return;
+  const useContext = document.getElementById('useContextToggle').checked;
+
+  chatHistory.push({ role: 'user', content: text });
+  saveChatHistory();
+  renderChatMessages();
+  chatInput.value = '';
+  sendBtn.disabled = true;
+
+  const pending = document.createElement('div');
+  pending.className = 'chat-msg assistant pending';
+  pending.textContent = '思考中…';
+  chatMessagesBox.appendChild(pending);
+  chatMessagesBox.scrollTop = chatMessagesBox.scrollHeight;
+
+  try {
+    const reply = await callClaudeAPI(text, useContext);
+    chatHistory.push({ role: 'assistant', content: reply });
+    saveChatHistory();
+    renderChatMessages();
+  } catch (err) {
+    pending.remove();
+    const errBox = document.createElement('div');
+    errBox.className = 'chat-msg error';
+    errBox.textContent = '❌ ' + (err.message || '發生未知錯誤，請確認 API Key 是否正確或稍後再試。');
+    chatMessagesBox.appendChild(errBox);
+    chatMessagesBox.scrollTop = chatMessagesBox.scrollHeight;
+  } finally {
+    sendBtn.disabled = false;
+  }
+});
+
+chatInput?.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    chatForm.requestSubmit();
+  }
+});
 
 // ---------- 初始化 ----------
 renderLedger();

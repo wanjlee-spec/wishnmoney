@@ -14,6 +14,7 @@
       <button class="tab-btn active" data-tab="ledger">記帳</button>
       <button class="tab-btn" data-tab="analysis">消費分析</button>
       <button class="tab-btn" data-tab="wishlist">心願清單</button>
+      <button class="tab-btn" data-tab="qa">投資問答</button>
     </nav>
   </header>
 
@@ -96,6 +97,33 @@
       </form>
 
       <div id="wishList" class="wish-list"></div>
+    </section>
+
+    <!-- 投資問答 -->
+    <section id="qa" class="tab-panel">
+      <div id="apiKeySetup" class="api-key-box">
+        <p>使用「投資問答」前，請先輸入你的 Anthropic API Key。金鑰只會存在你自己瀏覽器的 localStorage 裡，不會傳給我們或任何第三方，僅會直接送往 Anthropic 官方 API 用於回答問題。<br>還沒有 Key？<a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">點此前往 Anthropic Console 申請</a>（會產生依用量計費的 API 費用）。</p>
+        <div class="form-row">
+          <input type="password" id="apiKeyInput" placeholder="sk-ant-...">
+          <button id="saveApiKey" class="primary-btn key-btn">儲存金鑰</button>
+        </div>
+      </div>
+
+      <div id="qaMain" class="qa-main" hidden>
+        <div class="qa-toolbar">
+          <label class="ctx-toggle"><input type="checkbox" id="useContextToggle" checked> 帶入我的收支 / 心願資料作為回答參考</label>
+          <div class="qa-toolbar-actions">
+            <button id="clearChat" class="link-btn">清除對話</button>
+            <button id="changeApiKey" class="link-btn">更換金鑰</button>
+          </div>
+        </div>
+        <div id="chatMessages" class="chat-messages"></div>
+        <form id="chatForm" class="chat-form">
+          <textarea id="chatInput" rows="2" placeholder="輸入你的投資問題，例如：我每月能存5000元，想在3年內存到20萬，該怎麼配置？" required></textarea>
+          <button type="submit" class="primary-btn" id="sendBtn">送出</button>
+        </form>
+        <div class="qa-disclaimer">回答由 AI 自動產生，僅供參考，非正式投資建議，實際決策前請自行查證並評估風險。</div>
+      </div>
     </section>
   </main>
 </div>
