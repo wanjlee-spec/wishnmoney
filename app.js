@@ -63,10 +63,8 @@ loginBtn.addEventListener('click', async () => {
   }
 
   authMessage.textContent = '登入成功！';
-  console.log('登入使用者：', data.user);
 });
-
-// ---------- 資料儲存 ----------
+// ---------- 資料儲存 ----------// ---------- 資料儲存 ----------
 const STORAGE_KEY = 'wishBudgetData_v1';
 
 const CATEGORIES = {
