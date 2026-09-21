@@ -5,6 +5,64 @@ const SUPABASE_PUBLISHABLE_KEY = '這裡貼你的 Publishable Key';
 const supabaseClient = window.supabase.createClient(
   SUPABASE_URL,
   SUPABASE_PUBLISHABLE_KEY
+  // ===== Supabase 會員註冊 / 登入 =====
+
+const authEmail = document.getElementById('authEmail');
+const authPassword = document.getElementById('authPassword');
+const loginBtn = document.getElementById('loginBtn');
+const signupBtn = document.getElementById('signupBtn');
+const authMessage = document.getElementById('authMessage');
+
+// 註冊
+signupBtn.addEventListener('click', async () => {
+  const email = authEmail.value.trim();
+  const password = authPassword.value;
+
+  if (!email || !password) {
+    authMessage.textContent = '請輸入 Email 和密碼';
+    return;
+  }
+
+  const { data, error } = await supabaseClient.auth.signUp({
+    email,
+    password
+  });
+
+  if (error) {
+    authMessage.textContent = '註冊失敗：' + error.message;
+    return;
+  }
+
+  if (data.session) {
+    authMessage.textContent = '註冊成功，已登入！';
+  } else {
+    authMessage.textContent = '註冊成功，請到 Email 收信完成驗證。';
+  }
+});
+
+// 登入
+loginBtn.addEventListener('click', async () => {
+  const email = authEmail.value.trim();
+  const password = authPassword.value;
+
+  if (!email || !password) {
+    authMessage.textContent = '請輸入 Email 和密碼';
+    return;
+  }
+
+  const { data, error } = await supabaseClient.auth.signInWithPassword({
+    email,
+    password
+  });
+
+  if (error) {
+    authMessage.textContent = '登入失敗：' + error.message;
+    return;
+  }
+
+  authMessage.textContent = '登入成功！';
+  console.log('登入使用者：', data.user);
+});
 );// ---------- 資料儲存 ----------
 const STORAGE_KEY = 'wishBudgetData_v1';
 
