@@ -1,11 +1,13 @@
 // ===== Supabase 設定 =====
-const SUPABASE_URL = '這裡貼你的 Project URL';
-const SUPABASE_PUBLISHABLE_KEY = '這裡貼你的 Publishable Key';
+const SUPABASE_URL = 'https://hhgpmwffbhwjymmfcgzp.supabase.co/rest/v1/';
+const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_hDdSZiNilmCLse_550zouQ_mzcwd9fD';
 
 const supabaseClient = window.supabase.createClient(
   SUPABASE_URL,
   SUPABASE_PUBLISHABLE_KEY
-  // ===== Supabase 會員註冊 / 登入 =====
+);
+
+// ===== Supabase 會員註冊 / 登入 =====
 
 const authEmail = document.getElementById('authEmail');
 const authPassword = document.getElementById('authPassword');
@@ -63,7 +65,8 @@ loginBtn.addEventListener('click', async () => {
   authMessage.textContent = '登入成功！';
   console.log('登入使用者：', data.user);
 });
-);// ---------- 資料儲存 ----------
+
+// ---------- 資料儲存 ----------
 const STORAGE_KEY = 'wishBudgetData_v1';
 
 const CATEGORIES = {
