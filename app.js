@@ -1,6 +1,10 @@
 // ===== Supabase 設定 =====
-const SUPABASE_URL = 'https://hhgpmwffbhwjymmfcgzp.supabase.co/rest/v1/';
+const SUPABASE_URL = 'https://hhgpmwffbhwjymmfcgzp.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_hDdSZiNilmCLse_550zouQ_mzcwd9fD';
+
+if (!window.supabase) {
+  throw new Error('Supabase SDK 載入失敗，請確認 index.html 已先載入 @supabase/supabase-js@2');
+}
 
 const supabaseClient = window.supabase.createClient(
   SUPABASE_URL,
@@ -8,12 +12,70 @@ const supabaseClient = window.supabase.createClient(
 );
 
 // ===== Supabase 會員註冊 / 登入 =====
-
 const authEmail = document.getElementById('authEmail');
 const authPassword = document.getElementById('authPassword');
 const loginBtn = document.getElementById('loginBtn');
 const signupBtn = document.getElementById('signupBtn');
 const authMessage = document.getElementById('authMessage');
+const authBox = document.getElementById('authBox');
+
+if (!authEmail || !authPassword || !loginBtn || !signupBtn || !authMessage || !authBox) {
+  throw new Error('登入區塊元件不存在，請確認 index.html 的 authEmail / authPassword / loginBtn / signupBtn / authMessage / authBox id 都存在');
+}
+
+// 動態建立登出按鈕，不需要另外改 index.html
+let logoutBtn = document.getElementById('logoutBtn');
+if (!logoutBtn) {
+  logoutBtn = document.createElement('button');
+  logoutBtn.id = 'logoutBtn';
+  logoutBtn.type = 'button';
+  logoutBtn.textContent = '登出';
+  logoutBtn.hidden = true;
+  signupBtn.insertAdjacentElement('afterend', logoutBtn);
+}
+
+function showAuthMessage(message, isError = false) {
+  authMessage.textContent = message;
+  authMessage.style.color = isError ? '#b42318' : '';
+}
+
+function setAuthBusy(isBusy) {
+  loginBtn.disabled = isBusy;
+  signupBtn.disabled = isBusy;
+  logoutBtn.disabled = isBusy;
+}
+
+function updateAuthUI(user) {
+  const loggedIn = Boolean(user);
+  authEmail.disabled = loggedIn;
+  authPassword.disabled = loggedIn;
+  loginBtn.hidden = loggedIn;
+  signupBtn.hidden = loggedIn;
+  logoutBtn.hidden = !loggedIn;
+
+  if (loggedIn) {
+    authEmail.value = user.email || '';
+    authPassword.value = '';
+    showAuthMessage(`已登入：${user.email || '使用者'}`);
+  } else {
+    authEmail.disabled = false;
+    authPassword.disabled = false;
+    loginBtn.hidden = false;
+    signupBtn.hidden = false;
+    logoutBtn.hidden = true;
+  }
+}
+
+async function refreshAuthUI() {
+  try {
+    const { data, error } = await supabaseClient.auth.getSession();
+    if (error) throw error;
+    updateAuthUI(data.session?.user || null);
+  } catch (error) {
+    console.error('讀取登入狀態失敗：', error);
+    showAuthMessage('無法讀取登入狀態：' + (error.message || '未知錯誤'), true);
+  }
+}
 
 // 註冊
 signupBtn.addEventListener('click', async () => {
@@ -21,24 +83,37 @@ signupBtn.addEventListener('click', async () => {
   const password = authPassword.value;
 
   if (!email || !password) {
-    authMessage.textContent = '請輸入 Email 和密碼';
+    showAuthMessage('請輸入 Email 和密碼', true);
     return;
   }
 
-  const { data, error } = await supabaseClient.auth.signUp({
-    email,
-    password
-  });
-
-  if (error) {
-    authMessage.textContent = '註冊失敗：' + error.message;
+  if (password.length < 6) {
+    showAuthMessage('密碼至少需要 6 碼', true);
     return;
   }
 
-  if (data.session) {
-    authMessage.textContent = '註冊成功，已登入！';
-  } else {
-    authMessage.textContent = '註冊成功，請到 Email 收信完成驗證。';
+  setAuthBusy(true);
+  showAuthMessage('註冊中…');
+
+  try {
+    const { data, error } = await supabaseClient.auth.signUp({
+      email,
+      password
+    });
+
+    if (error) throw error;
+
+    if (data.session && data.user) {
+      updateAuthUI(data.user);
+      showAuthMessage('註冊成功，已登入！');
+    } else {
+      showAuthMessage('註冊成功，請到 Email 收信完成驗證。');
+    }
+  } catch (error) {
+    console.error('註冊失敗：', error);
+    showAuthMessage('註冊失敗：' + (error.message || '未知錯誤'), true);
+  } finally {
+    setAuthBusy(false);
   }
 });
 
@@ -48,23 +123,57 @@ loginBtn.addEventListener('click', async () => {
   const password = authPassword.value;
 
   if (!email || !password) {
-    authMessage.textContent = '請輸入 Email 和密碼';
+    showAuthMessage('請輸入 Email 和密碼', true);
     return;
   }
 
-  const { data, error } = await supabaseClient.auth.signInWithPassword({
-    email,
-    password
-  });
+  setAuthBusy(true);
+  showAuthMessage('登入中…');
 
-  if (error) {
-    authMessage.textContent = '登入失敗：' + error.message;
-    return;
+  try {
+    const { data, error } = await supabaseClient.auth.signInWithPassword({
+      email,
+      password
+    });
+
+    if (error) throw error;
+
+    updateAuthUI(data.user);
+    showAuthMessage('登入成功！');
+  } catch (error) {
+    console.error('登入失敗：', error);
+    showAuthMessage('登入失敗：' + (error.message || '未知錯誤'), true);
+  } finally {
+    setAuthBusy(false);
   }
-
-  authMessage.textContent = '登入成功！';
 });
-// ---------- 資料儲存 ----------// ---------- 資料儲存 ----------
+
+// 登出
+logoutBtn.addEventListener('click', async () => {
+  setAuthBusy(true);
+  try {
+    const { error } = await supabaseClient.auth.signOut();
+    if (error) throw error;
+
+    authEmail.value = '';
+    authPassword.value = '';
+    updateAuthUI(null);
+    showAuthMessage('已登出');
+  } catch (error) {
+    console.error('登出失敗：', error);
+    showAuthMessage('登出失敗：' + (error.message || '未知錯誤'), true);
+  } finally {
+    setAuthBusy(false);
+  }
+});
+
+supabaseClient.auth.onAuthStateChange((_event, session) => {
+  updateAuthUI(session?.user || null);
+});
+
+refreshAuthUI();
+
+// ---------- 資料儲存 ----------
 const STORAGE_KEY = 'wishBudgetData_v1';
 
 const CATEGORIES = {
@@ -98,7 +207,11 @@ function monthKey(dateStr) {
 }
 
 function todayStr() {
-  return new Date().toISOString().slice(0, 10);
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
 }
 
 function monthLabel(key) {
