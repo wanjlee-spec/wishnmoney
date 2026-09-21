@@ -1,4 +1,11 @@
-// ---------- 資料儲存 ----------
+// ===== Supabase 設定 =====
+const SUPABASE_URL = '這裡貼你的 Project URL';
+const SUPABASE_PUBLISHABLE_KEY = '這裡貼你的 Publishable Key';
+
+const supabaseClient = window.supabase.createClient(
+  SUPABASE_URL,
+  SUPABASE_PUBLISHABLE_KEY
+);// ---------- 資料儲存 ----------
 const STORAGE_KEY = 'wishBudgetData_v1';
 
 const CATEGORIES = {
